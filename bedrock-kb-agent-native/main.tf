@@ -149,6 +149,7 @@ resource "aws_bedrockagent_knowledge_base" "this" {
   depends_on = [
     aws_iam_role_policy.knowledge_base,
     aws_opensearchserverless_access_policy.bedrock_kb,
+    opensearch_index.bedrock_kb,
   ]
 }
 

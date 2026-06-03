@@ -29,6 +29,17 @@ variable "embedding_model_arn" {
   }
 }
 
+variable "embedding_vector_dimension" {
+  description = "Vector dimension for the OpenSearch Serverless knn index (must match the embedding model; Titan Embed Text v2 = 1024)."
+  type        = number
+  default     = 1024
+
+  validation {
+    condition     = var.embedding_vector_dimension >= 1 && var.embedding_vector_dimension <= 4096
+    error_message = "embedding_vector_dimension must be between 1 and 4096."
+  }
+}
+
 variable "foundation_model_id" {
   description = "Bedrock foundation model ID for the agent orchestration model"
   type        = string
