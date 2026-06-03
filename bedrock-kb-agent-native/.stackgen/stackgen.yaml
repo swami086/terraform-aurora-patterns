@@ -1,4 +1,4 @@
-version: "1.0"
+version: "1.0.3"
 
 representation:
   side_panel:
@@ -70,7 +70,7 @@ variables:
     ui_control: "textarea"
   tags:
     label: "Tags"
-    description: "Optional tags for IAM roles."
+    description: "Tags applied to Bedrock and IAM resources (ManagedBy and Module are merged automatically)."
     type: "map(string)"
     ui_control: "dictionary"
 

@@ -1,0 +1,73 @@
+version: "1.0.2"
+
+representation:
+  side_panel:
+    label: "Databricks Lakehouse"
+    icon: "databricks"
+  node:
+    label:
+      static: "Databricks Lakehouse"
+
+variables:
+  lakehouse_bucket:
+    label: "Lakehouse S3 Bucket"
+    description: "S3 bucket name for the Unity Catalog external location."
+    type: "string"
+    ui_control: "text"
+    validation:
+      required: true
+  iam_role_arn:
+    label: "IAM Role ARN"
+    description: "IAM role ARN with access to the lakehouse bucket."
+    type: "string"
+    ui_control: "text"
+    validation:
+      required: true
+  databricks_host:
+    label: "Databricks Host"
+    description: "Workspace URL (https://dbc-....cloud.databricks.com)."
+    type: "string"
+    ui_control: "text"
+    validation:
+      required: true
+  databricks_token:
+    label: "Databricks Token"
+    description: "PAT for Terraform Databricks provider (sensitive)."
+    type: "string"
+    ui_control: "password"
+    validation:
+      required: true
+  name_prefix:
+    label: "Resource Name Prefix"
+    description: "Prefix for SQL endpoint, credential, and external location names."
+    type: "string"
+    ui_control: "text"
+
+layouts:
+  - name: default
+    label: Default
+    sections:
+      - type: section
+        label: Required
+        attributes:
+          - lakehouse_bucket
+          - iam_role_arn
+          - databricks_host
+          - databricks_token
+      - type: section
+        label: Optional
+        attributes:
+          - name_prefix
+
+variable_groups:
+  - label: "Required"
+    description: "Lakehouse wiring to S3 and Databricks workspace"
+    variables:
+      - lakehouse_bucket
+      - iam_role_arn
+      - databricks_host
+      - databricks_token
+  - label: "Optional"
+    description: "Naming"
+    variables:
+      - name_prefix

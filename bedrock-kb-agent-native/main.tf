@@ -1,13 +1,9 @@
-data "aws_caller_identity" "current" {}
-data "aws_partition" "current" {}
-
-locals {
-  account_id = data.aws_caller_identity.current.account_id
-  partition  = data.aws_partition.current.partition
-}
+# ------------------------------------------------------------------------------
+# Knowledge Base — IAM
+# ------------------------------------------------------------------------------
 
 resource "aws_iam_role" "knowledge_base" {
-  name = "${var.kb_name}-kb-role"
+  name = local.kb_role_name
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -28,7 +24,7 @@ resource "aws_iam_role" "knowledge_base" {
     }]
   })
 
-  tags = var.tags
+  tags = local.common_tags
 }
 
 resource "aws_iam_role_policy" "knowledge_base" {
@@ -39,6 +35,7 @@ resource "aws_iam_role_policy" "knowledge_base" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "InvokeEmbeddingModel"
         Effect = "Allow"
         Action = [
           "bedrock:InvokeModel"
@@ -46,6 +43,7 @@ resource "aws_iam_role_policy" "knowledge_base" {
         Resource = [var.embedding_model_arn]
       },
       {
+        Sid    = "ReadKnowledgeDocuments"
         Effect = "Allow"
         Action = [
           "s3:GetObject",
@@ -57,13 +55,7 @@ resource "aws_iam_role_policy" "knowledge_base" {
         ]
       },
       {
-        Effect = "Allow"
-        Action = [
-          "aoss:APIAccessAll"
-        ]
-        Resource = [var.opensearch_domain_arn]
-      },
-      {
+        Sid    = "OpenSearchManagedCluster"
         Effect = "Allow"
         Action = [
           "es:DescribeDomain",
@@ -81,6 +73,10 @@ resource "aws_iam_role_policy" "knowledge_base" {
     ]
   })
 }
+
+# ------------------------------------------------------------------------------
+# Knowledge Base — Bedrock resources
+# ------------------------------------------------------------------------------
 
 resource "aws_bedrockagent_knowledge_base" "this" {
   name     = var.kb_name
@@ -111,7 +107,9 @@ resource "aws_bedrockagent_knowledge_base" "this" {
     }
   }
 
-  tags = var.tags
+  tags = local.common_tags
+
+  depends_on = [aws_iam_role_policy.knowledge_base]
 }
 
 resource "aws_bedrockagent_data_source" "s3" {
@@ -125,10 +123,16 @@ resource "aws_bedrockagent_data_source" "s3" {
       bucket_arn = var.s3_bucket_arn
     }
   }
+
+  depends_on = [aws_bedrockagent_knowledge_base.this]
 }
 
+# ------------------------------------------------------------------------------
+# Agent — IAM
+# ------------------------------------------------------------------------------
+
 resource "aws_iam_role" "agent" {
-  name = "${var.agent_name}-agent-role"
+  name = local.agent_role_name
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -149,7 +153,7 @@ resource "aws_iam_role" "agent" {
     }]
   })
 
-  tags = var.tags
+  tags = local.common_tags
 }
 
 resource "aws_iam_role_policy" "agent" {
@@ -160,16 +164,16 @@ resource "aws_iam_role_policy" "agent" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "InvokeFoundationModel"
         Effect = "Allow"
         Action = [
           "bedrock:InvokeModel",
           "bedrock:InvokeModelWithResponseStream"
         ]
-        Resource = [
-          "arn:${local.partition}:bedrock:${var.region}::foundation-model/${var.foundation_model_id}"
-        ]
+        Resource = [local.foundation_model_arn]
       },
       {
+        Sid    = "RetrieveFromKnowledgeBase"
         Effect = "Allow"
         Action = [
           "bedrock:Retrieve",
@@ -181,6 +185,10 @@ resource "aws_iam_role_policy" "agent" {
   })
 }
 
+# ------------------------------------------------------------------------------
+# Agent — Bedrock resources
+# ------------------------------------------------------------------------------
+
 resource "aws_bedrockagent_agent" "this" {
   agent_name              = var.agent_name
   agent_resource_role_arn = aws_iam_role.agent.arn
@@ -188,12 +196,16 @@ resource "aws_bedrockagent_agent" "this" {
   instruction             = var.agent_instruction
   prepare_agent           = true
 
-  tags = var.tags
+  tags = local.common_tags
+
+  depends_on = [aws_iam_role_policy.agent]
 }
 
 resource "aws_bedrockagent_agent_alias" "this" {
   agent_alias_name = "live"
   agent_id         = aws_bedrockagent_agent.this.id
+
+  depends_on = [aws_bedrockagent_agent.this]
 }
 
 resource "aws_bedrockagent_agent_knowledge_base_association" "this" {
@@ -201,4 +213,10 @@ resource "aws_bedrockagent_agent_knowledge_base_association" "this" {
   description          = "Platform knowledge base association"
   knowledge_base_id    = aws_bedrockagent_knowledge_base.this.id
   knowledge_base_state = "ENABLED"
+
+  depends_on = [
+    aws_bedrockagent_agent.this,
+    aws_bedrockagent_agent_alias.this,
+    aws_bedrockagent_data_source.s3,
+  ]
 }
